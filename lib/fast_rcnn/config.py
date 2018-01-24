@@ -97,6 +97,12 @@ __C.TRAIN.BBOX_NORMALIZE_STDS = (0.1, 0.1, 0.2, 0.2)
 # Train using these proposals
 __C.TRAIN.PROPOSAL_METHOD = 'selective_search'
 
+
+
+
+# whether use class aware box or not
+__C.TRAIN.AGNOSTIC = False
+
 # Make minibatches from images that have similar aspect ratios (i.e. both
 # tall and thin or both short and wide) in order to avoid wasting computation
 # on zero-padding.
@@ -170,6 +176,8 @@ __C.TEST.RPN_POST_NMS_TOP_N = 300
 # Proposal height and width both need to be greater than RPN_MIN_SIZE (at orig image scale)
 __C.TEST.RPN_MIN_SIZE = 16
 
+# whether use class aware box or not
+__C.TEST.AGNOSTIC = False
 
 #
 # MISC

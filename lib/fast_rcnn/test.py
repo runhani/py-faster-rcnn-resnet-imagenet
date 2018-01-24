@@ -14,11 +14,12 @@ from utils.timer import Timer
 import numpy as np
 import cv2
 import caffe
-from fast_rcnn.nms_wrapper import nms
+from fast_rcnn.nms_wrapper import nms, soft_nms
 import cPickle
 from utils.blob import im_list_to_blob
 import os
 import multiprocessing as mp
+from utils.cython_bbox import bbox_vote
 
 def _get_image_blob(im):
     """Converts an image into a network input.
@@ -203,6 +204,16 @@ def vis_detections(im, class_name, dets, thresh=0.3):
             plt.title('{}  {:.3f}'.format(class_name, score))
             plt.show()
 
+def save_detections(im, class_name, dets, index, thresh=0.3):
+    for i in xrange(np.minimum(10, dets.shape[0])):
+        bbox = dets[i, :4]
+        score = dets[i, -1]
+        if score > thresh:
+            cv2.putText(im, class_name, (bbox[0], bbox[1]), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 0), 1)
+            cv2.rectangle(im, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 0, 0), 4)
+    saveFileName = 'result/%d.jpg' % index
+    cv2.imwrite(saveFileName, im)
+
 def apply_nms(all_boxes, thresh):
     """Apply non-maximum suppression to all predicted boxes output by the
     test_net method.
@@ -263,6 +274,12 @@ def test_net_multi_gpus(prototxt, caffemodel, gpus, imdb, max_per_image=100, thr
     print 'Evaluating detections'
     imdb.evaluate_detections(all_boxes, output_dir)
 
+
+def psoft(cls_dets):
+    keep = soft_nms(cls_dets, method=cfg.TEST.SOFT_NMS)
+    return cls_dets[keep]
+
+
 def test_net(prototxt, caffemodel, imdb, gpus, rank, results_dict, roidb=None, 
     max_per_image=100, thresh=0.05, vis=False):
     """Test a Fast R-CNN network on an image database."""
@@ -314,10 +331,19 @@ def test_net(prototxt, caffemodel, imdb, gpus, rank, results_dict, roidb=None,
             cls_boxes = boxes[inds, j*4:(j+1)*4]
             cls_dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])) \
                 .astype(np.float32, copy=False)
-            keep = nms(cls_dets, cfg.TEST.NMS)
+            #keep = nms(cls_dets, cfg.TEST.NMS)
+            keep = soft_nms(cls_dets, method=cfg.TEST.SOFT_NMS)
+
+            dets_NMSed = cls_dets[keep, :]
+            if cfg.TEST.BBOX_VOTE:
+                cls_dets = bbox_vote(dets_NMSed, cls_dets)
+            else:
+                cls_dets = dets_NMSed
+
             cls_dets = cls_dets[keep, :]
-            if vis:
-                vis_detections(im, imdb.classes[j], cls_dets)
+            save_detections(im, imdb.classes[j], cls_dets, j)
+            #if vis:
+            #    vis_detections(im, imdb.classes[j], cls_dets)
             all_boxes[j][result_index] = cls_dets
 
         # Limit to max_per_image detections *over all classes*

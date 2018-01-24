@@ -407,6 +407,10 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
   optional SmoothL1LossParameter smooth_l1_loss_param = 8266712;
   optional ROIPoolingParameter roi_pooling_param = 8266711;
+  optional PSROIPoolingParameter psroi_pooling_param = 148;
+  optional BoxAnnotatorOHEMParameter box_annotator_ohem_param = 151;
+  optional ROIMaskPoolingParameter roi_mask_pooling_param = 8266713;
+  optional ROIAlignParameter roi_align_param = 20005;
 }
 
 // Message that stores parameters used to apply transformation
@@ -449,8 +453,10 @@ message LossParameter {
     VALID = 1;
     // Divide by the batch size.
     BATCH_SIZE = 2;
+    // Divide by pre-fixed normalizer
+    PRE_FIXED = 3;
     // Do not normalize the loss.
-    NONE = 3;
+    NONE = 4;
   }
   // For historical reasons, the default normalization for
   // SigmoidCrossEntropyLoss is BATCH_SIZE and *not* VALID.
@@ -459,6 +465,8 @@ message LossParameter {
   // is not specified, then setting this to false will be equivalent to
   // normalization = BATCH_SIZE to be consistent with previous behavior.
   optional bool normalize = 2;
+
+  optional float pre_fixed_normalizer = 4 [default = 1];
 }
 
 // Messages that store parameters used by individual layer types follow, in
@@ -524,6 +532,12 @@ message BatchNormParameter {
   // zero.
   optional float eps = 3 [default = 1e-5];
 }
+
+message BoxAnnotatorOHEMParameter {
+  required uint32 roi_per_img = 1; // number of rois for training
+  optional int32 ignore_label = 2 [default = -1]; // ignore_label in scoring
+}
+
 
 message BiasParameter {
   // The first axis of bottom[0] (the first input Blob) along which to apply
@@ -1413,6 +1427,33 @@ message PReLUParameter {
   optional bool channel_shared = 2 [default = false];
 }
 
+// Message that stores parameters used by ROIAlignLayer
+message ROIAlignParameter {
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in height and width or as Y, X pairs.
+  optional uint32 pooled_h = 1 [default = 0]; // The pooled output height
+  optional uint32 pooled_w = 2 [default = 0]; // The pooled output width
+  // Multiplicative spatial scale factor to translate ROI coords from their
+  // input scale to the scale used when pooling
+  optional float spatial_scale = 3 [default = 1];
+}
+
+// Message that stores parameters used by ROIMaskPooling
+message ROIMaskPoolingParameter {
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in height and width or as Y, X pairs.
+  optional uint32 pooled_h = 1 [default = 0]; // The pooled output height
+  optional uint32 pooled_w = 2 [default = 0]; // The pooled output width
+  // Multiplicative spatial scale factor to translate ROI coords from their
+  // input scale to the scale used when pooling
+  optional float spatial_scale = 3 [default = 1];
+  optional float spatial_shift = 7 [default = 0];
+  optional int32 half_part = 4 [default = 0];
+  optional float roi_scale = 5 [default = 1];
+  optional float mask_scale = 6 [default = 0];
+}
+
+
 // Message that stores parameters used by ROIPoolingLayer
 message ROIPoolingParameter {
   // Pad, kernel size, and stride are all given as a single value for equal
@@ -1423,6 +1464,13 @@ message ROIPoolingParameter {
   // input scale to the scale used when pooling
   optional float spatial_scale = 3 [default = 1];
 }
+
+message PSROIPoolingParameter {
+   required float spatial_scale = 1; 
+   required int32 output_dim = 2; // output channel number
+   required int32 group_size = 3; // number of groups to encode position-sensitive score maps
+}
+
 
 message SmoothL1LossParameter {
   // SmoothL1Loss(x) =
